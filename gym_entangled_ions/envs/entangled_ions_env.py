@@ -14,8 +14,10 @@ class EntangledIonsEnv(gym.Env, QuditQM):
         laser pulses and global molmer sorensen gates. 
         At each time step an agent can choose one gate to apply to the current
         quantum state of the environment. 
-        The state, as well as observation, is a d^n dimensional quantum state 
-        where d is the local dimension of each ion and n is the number of ions. 
+        The environment state is a d^n dimensional quantum state where d is the 
+        local dimension of each ion and n is the number of ions. 
+        The observation is a 2d^n dimensional vector representing real and 
+        imaginary vector components.
         The initial state is |0...0>.
         The goal is to create multipartite high-dimensional entanglement between 
         ions characterizsed by a Schmidt rank vector. Once such a state has 
@@ -36,8 +38,6 @@ class EntangledIonsEnv(gym.Env, QuditQM):
                                 'ms_phases': [-np.pi/2]}
                 max_steps (int): The maximum number of allowed time steps.
                                  Defaults to 10.
-                
-                
         """
         # this is just checking whether kwargs are provided and adds defaults
         if 'num_ions' in kwargs and type(kwargs['num_ions']) is int:
@@ -67,12 +67,22 @@ class EntangledIonsEnv(gym.Env, QuditQM):
 
         # add methods (such as `ket` or `srv`) from parent
         super().__init__(self.dim, self.num_ions)
+        #spaces.Box: The observation space as defined by `gym`
+        #NOTE: |bounds| > 1. to avoid precision errors
+        o_size = self.dim**self.num_ions * 2
+        self.observation_space = gym.spaces.Box(low=-1.00001, 
+                                                high=1.00001, 
+                                                shape=(o_size,1),
+                                                dtype=np.float64
+                                                )
         #:class:`LaserGates`: The laser gates used for actions.
         self.gates = LaserGates(self.dim, self.num_ions, self.phases)
         #list: The action gate set.
         self.actions = self.gates.gates
         #int: Number of gates.
         self.num_actions = len(self.gates.gates)
+        #spaces.Discrete: The action space as defined by `gym`
+        self.action_space = gym.spaces.Discrete(self.num_actions)
         #np.ndarray: Initial state.
         self.init_state = reduce(np.kron, 
                                  [self.ket(0) for i in range(self.num_ions)]
@@ -87,12 +97,14 @@ class EntangledIonsEnv(gym.Env, QuditQM):
         Resets the environment to its initial state, i.e., |0...0>.
         
         Returns:
-            state (np.ndarray): Initial state vector.
+            observation (np.ndarray): Initial environment state.
         """
         self.state = self.init_state
         self.time_step = 0
 
-        return self.state
+        observation = np.append(self.state.real, self.state.imag, axis=0)
+
+        return observation
 
     def step(self, action):
         """
@@ -110,9 +122,10 @@ class EntangledIonsEnv(gym.Env, QuditQM):
             action (int): Index of action in gate set.
 
         Returns:
-            state (np.ndarray): Current state of the environment.
+            observation (np.ndarray): Representation of environment state.
             reward (float): Current reward.
             done (bool): Whether or not the episode is done.
+            info (dict): Additional information. Not provided.
         """
         done = False
         reward = 0.
@@ -129,4 +142,6 @@ class EntangledIonsEnv(gym.Env, QuditQM):
         elif self.time_step >= self.max_steps:
             done = True
 
-        return self.state, reward, done
+        observation = np.append(self.state.real, self.state.imag, axis=0)
+
+        return observation, reward, done, {}
