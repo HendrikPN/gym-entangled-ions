@@ -51,7 +51,14 @@ class EntangledIonsEnv(gym.Env, QuditQM):
         if 'goal' in kwargs and type(kwargs['goal']) is list:
             setattr(self, 'goal', kwargs['goal'])
         else:
-            setattr(self, 'goal', [[3,3,3]])
+            setattr(self, 'goal', [[2,2,2]])
+
+        if 'srv_goal_conditions' in kwargs and type(kwargs['srv_goal_conditions']) is dict:
+            setattr(self, 'srv_goal_conditions', kwargs['srv_goal_conditions'])
+            self.goal = []
+        else:
+            setattr(self, 'srv_goal_conditions', {})
+
         if 'phases' in kwargs and type(kwargs['phases']) is dict:
             setattr(self, 'phases', kwargs['phases'])
         else:
@@ -136,12 +143,27 @@ class EntangledIonsEnv(gym.Env, QuditQM):
         # (2) Calculate SRV
         srv = self.srv(self.state)
         # (3) Finish episode and give reward if appropriate
-        if srv in self.goal:
-            done = True
-            reward = 1.
-        elif self.time_step >= self.max_steps:
-            done = True
+        reward, done = self.get_reward(srv)
 
         observation = np.append(self.state.real, self.state.imag, axis=0)
 
         return observation, reward, done, {}
+
+#-------------------------------helper function------------------------------------------------
+
+    def get_reward(self,srv):
+        reward = 0.
+        done = False
+        if self.time_step >= self.max_steps:
+            done = True
+            reward = 0.
+        elif srv in self.goal:
+            done = True
+            reward = 1.
+        else:
+            for key in self.srv_goal_conditions.keys():
+                condition = srv.count(key)
+                if condition >= self.srv_goal_conditions[key]:
+                    reward = 1.
+                    done = True
+        return reward, done
