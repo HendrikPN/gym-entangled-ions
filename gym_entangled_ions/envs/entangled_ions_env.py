@@ -50,6 +50,7 @@ class EntangledIonsEnv(gym.Env, QuditQM):
             setattr(self, 'dim', 3)
         if 'goal' in kwargs and type(kwargs['goal']) is list:
             setattr(self, 'goal', kwargs['goal'])
+            self.srv_max = 0
         else:
             setattr(self, 'goal', [[2,2,2]])
 
@@ -58,6 +59,12 @@ class EntangledIonsEnv(gym.Env, QuditQM):
             self.goal = []
         else:
             setattr(self, 'srv_goal_conditions', {})
+
+        if 'srv_max' in kwargs and type(kwargs['srv_max']) is int:
+            setattr(self, 'srv_max', kwargs['srv_max'])
+            self.goal = []
+        else:
+            setattr(self, 'srv_max', 0)
 
         if 'phases' in kwargs and type(kwargs['phases']) is dict:
             setattr(self, 'phases', kwargs['phases'])
@@ -98,6 +105,8 @@ class EntangledIonsEnv(gym.Env, QuditQM):
         self.state = self.init_state
         #int: Current number of time steps.
         self.time_step = 0
+        #reward counter
+        self.counter = 0
     
     def reset(self):
         """
@@ -160,10 +169,8 @@ class EntangledIonsEnv(gym.Env, QuditQM):
         elif srv in self.goal:
             done = True
             reward = 1.
-        else:
-            for key in self.srv_goal_conditions.keys():
-                condition = srv.count(key)
-                if condition >= self.srv_goal_conditions[key]:
-                    reward = 1.
-                    done = True
+        elif max(srv)>=self.srv_max and self.srv_max !=0:
+            done = True
+            reward = 1.
+            self.counter+=1
         return reward, done
