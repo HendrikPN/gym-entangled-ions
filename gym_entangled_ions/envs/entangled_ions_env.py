@@ -97,6 +97,9 @@ class EntangledIonsEnv(gym.Env, QuditQM):
         self.num_actions = len(self.gates.gates)
         #spaces.Discrete: The action space as defined by `gym`
         self.action_space = gym.spaces.Discrete(self.num_actions)
+        #get list of action labels
+        self.action_labels = self.gates.action_labels
+
         #np.ndarray: Initial state.
         self.init_state = reduce(np.kron, 
                                  [self.ket(0) for i in range(self.num_ions)]
@@ -174,3 +177,17 @@ class EntangledIonsEnv(gym.Env, QuditQM):
             reward = 1.
             self.counter+=1
         return reward, done
+
+
+if __name__ == "__main__":
+    name = 'entangled-ions-v0'
+    # dimension of the qudit
+    DIM = 3
+    # number of qudits
+    NUM_IONS = 5
+    # number of operations:
+    MAX_OP = 10
+    # conditioons for the reward function
+    SRV_MAX = 2
+    env = gym.make(name, dim=DIM, num_ions=NUM_IONS, max_op=MAX_OP, srv_max=SRV_MAX)
+    print(env.action_labels)
