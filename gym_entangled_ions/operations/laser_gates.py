@@ -34,9 +34,10 @@ class LaserGates(QuditQM):
         self.ms_phases = phases['ms_phases']
         #`list` of `np.ndarray`: List of unitaries.
         self.gates = []
+        #`list` of `np.ndarray`: List of action labels.
         self.action_labels = []
         # fills the `gates` with unitaries as specified by the angles.
-        # filles 'label_list' with the labels for each action or gate
+        # fills 'label_list' with the labels for each action or gate
         self._generate_gates()
 
     def pulse(self, j, k, theta, phi):
@@ -93,7 +94,7 @@ class LaserGates(QuditQM):
     
     def molmer_sorensen(self, theta):
         """
-        Molmer-Sorensen (MS) gate from Eq. (21) of
+        Global Molmer-Sorensen (MS) gate from Eq. (21) of
         https://arxiv.org/pdf/1907.08569.pdf.
         This is a global laser beam that can entangle all ions.
 
@@ -131,7 +132,7 @@ class LaserGates(QuditQM):
 
     def molmer_sorensen_local(self, theta, parties):
         """
-        Molmer-Sorensen (MS) gate from Eq. (21) of
+        Local Molmer-Sorensen (MS) gate from Eq. (21) of
         https://arxiv.org/pdf/1907.08569.pdf.
         This is a global laser beam that can entangle all ions.
 
@@ -144,6 +145,7 @@ class LaserGates(QuditQM):
 
         Args:
             theta (float): The MS phase (depending on the Rabi frequency).
+            parties (tuple): The ions to which the MS is applied.
         Returns:
             ms (np.ndarray): MS gate unitary acting on all ions.
         """
@@ -170,49 +172,64 @@ class LaserGates(QuditQM):
         """
         Adds single-ion and MS unitaries to the list of n-ion gates according to
         the provided list of phases.
+
+        Adds labels in the form [ions] + [transitions] + [angle] + [phase] where
+        [ions] is e.g., [1,1,0] for a 2-qubit gate on ions 0 and 1.
+        [transitions] is e.g., [1,1,0] for a transition between |0> and |1>.
+        [angle] is the laser pulse angle.
+        [phase] is the laser pulse phase.
         """
-        label = np.array([0, 0, 0, 0, 0])
         # adds all single-ion gates
         # for all ions
-        label[0]=1
         for ion in range(self.num_ions):
-            label[1]+=1
-            label[2]=0
-            label[3]=0
-            label[4]=0
+            # collect ion label
+            label_ions = np.zeros(self.num_ions)
+            label_ions[ion] = 1.
             # for all transitions k <--> k+1
             for k in range(self.dim-1):
+                # collect transition labels
+                label_trans = np.zeros(self.dim)
+                label_trans[k], label_trans[k+1] = 1., 1.
                 # for all angles theta
-                label[2] +=1
-                label[3] = 0
-                label[4] = 0
                 for theta in self.pulse_angles:
+                    # collect pulse angle label
+                    label_angle = np.array([theta])
                     # for all angles phi
-                    label[3]+=1
-                    label[4]=0
                     for phi in self.pulse_phases:
+                        # collect pulse phase label
+                        label_phase = np.array([phi])
                         # create gate
-                        label[4]+=1
                         gate = self.pulse(k, k+1, theta, phi)
                         # add n-ion gate
                         self.gates.append(self.pad_gate(gate, ion))
-                        self.action_labels.append(label.copy())
+                        # add label
+                        label = np.concatenate((label_ions, 
+                                                label_trans, 
+                                                label_angle, 
+                                                label_phase), 
+                                                axis=None)
+                        self.action_labels.append(label)
 
         # add all ms gates
-        label = np.array([0, 0, 0, 0, 0])
         for ions in range(2,self.num_ions+1):
-            label[0]=ions
-            label[1] = 0
-            label[2] = 1
-            label[3] = 0
-            label[4] = 1
             party_combinations = combinations(range(self.num_ions),ions)
             for parties in party_combinations:
-                label[1] += 1
-                label[3] = 0
+                # collect ion label
+                label_ions = np.zeros(self.num_ions)
+                for ion in parties:
+                    label_ions[ion] = 1.
+                # collect transition labels (all)
+                label_trans = np.ones(self.dim)
                 for theta in self.ms_phases:
-                    label[3] += 1
+                    # collect angle angle label
+                    label_angle = np.array([theta])
+                    # collect pulse labels (none)
+                    label_phase = np.array([0.])
                     self.gates.append(self.molmer_sorensen_local(theta,parties))
+                    # add label
+                    label = np.concatenate((label_ions, 
+                                            label_trans, 
+                                            label_angle, 
+                                            label_phase), 
+                                            axis=None)
                     self.action_labels.append(label.copy())
-
-

@@ -17,17 +17,18 @@ o,r,_,_=env.step(1)
 
 o,r,_,_=env.step(3)
 
-print(o)
+# print(o)
 
-print(o.real)
-print(o.imag)
+# print(o.real)
+# print(o.imag)
 
-print(o.shape)
+# print(o.shape)
 
-print(o.dtype)
+# print(o.dtype)
 
-print(env.observation_space)
+# print(env.observation_space)
 
+print(env.action_labels)
 
 # timing = []
 # timing_a = []
@@ -52,3 +53,22 @@ print(env.observation_space)
 # print(t)
 # print(t_a)
 
+if __name__ == "__main__":
+    import gym
+    name = 'entangled-ions-v0'
+    # dimension of the qudit
+    DIM = 3
+    # number of qudits
+    NUM_IONS = 5
+    # number of operations:
+    MAX_OP = 10
+    # conditioons for the reward function
+    goal_srv_max = 3
+    env = gym.make(name, dim=DIM, num_ions=NUM_IONS, max_op=MAX_OP, goal_srv_max=goal_srv_max)
+    print(env.action_labels)
+    done = False
+    while not done:
+        action = np.random.choice(env.num_actions)
+        o, r, done, _ = env.step(action)
+        print(o)
+        print(f'reward: {r}')

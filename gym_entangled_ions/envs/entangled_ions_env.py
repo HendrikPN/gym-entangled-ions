@@ -31,6 +31,9 @@ class EntangledIonsEnv(gym.Env, QuditQM):
                 dim (int): The local (odd) dimension of an ion. Defaults to 3.
                 goal (list): List of SRVs that are rewarded. 
                              Defaults to [[3,3,3]].
+                goal_srv_max (int): If >0, this rewards SRVs with at least one 
+                                    value >= this value. Overwrites `goal`. 
+                                    Defaults to None.
                 phases (dict): The phases defining the laser gate set.
                                Defaults to 
                                {'pulse_angles': [np.pi/2],
@@ -50,22 +53,13 @@ class EntangledIonsEnv(gym.Env, QuditQM):
             setattr(self, 'dim', 3)
         if 'goal' in kwargs and type(kwargs['goal']) is list:
             setattr(self, 'goal', kwargs['goal'])
-            self.srv_max = 0
         else:
-            setattr(self, 'goal', [[2,2,2]])
-
-        if 'srv_goal_conditions' in kwargs and type(kwargs['srv_goal_conditions']) is dict:
-            setattr(self, 'srv_goal_conditions', kwargs['srv_goal_conditions'])
+            setattr(self, 'goal', [[3,3,3]])
+        if 'goal_srv_max' in kwargs and type(kwargs['goal_srv_max']) is int:
+            setattr(self, 'goal_srv_max', kwargs['goal_srv_max'])
             self.goal = []
         else:
-            setattr(self, 'srv_goal_conditions', {})
-
-        if 'srv_max' in kwargs and type(kwargs['srv_max']) is int:
-            setattr(self, 'srv_max', kwargs['srv_max'])
-            self.goal = []
-        else:
-            setattr(self, 'srv_max', 0)
-
+            setattr(self, 'goal_srv_max', None)
         if 'phases' in kwargs and type(kwargs['phases']) is dict:
             setattr(self, 'phases', kwargs['phases'])
         else:
@@ -108,8 +102,8 @@ class EntangledIonsEnv(gym.Env, QuditQM):
         self.state = self.init_state
         #int: Current number of time steps.
         self.time_step = 0
-        #reward counter
-        self.counter = 0
+        #int: reward counter # TODO: remove
+        self.rew_counter = 0
     
     def reset(self):
         """
@@ -155,7 +149,7 @@ class EntangledIonsEnv(gym.Env, QuditQM):
         # (2) Calculate SRV
         srv = self.srv(self.state)
         # (3) Finish episode and give reward if appropriate
-        reward, done = self.get_reward(srv)
+        reward, done = self._get_reward(srv)
 
         observation = np.append(self.state.real, self.state.imag, axis=0)
 
@@ -163,31 +157,32 @@ class EntangledIonsEnv(gym.Env, QuditQM):
 
 #-------------------------------helper function------------------------------------------------
 
-    def get_reward(self,srv):
+    def _get_reward(self, srv):
+        """
+        Calculates the current reward. If `goal_srv_max` was specified, it gives
+        a reward iff the SRV contains a value larger than `goal_srv_max`. If it
+        was not specified it gives a reward if the SRV is part of the list of 
+        rewarded SRVs in `goal`. If the maximum time steps have been reached and
+        no reward received, it declares `done`.
+
+        Args:
+            srv (list): SRV of current state.
+        
+        Returns:
+            reward (float): Reward for current state.
+            done (bool): Whether or not episode has finished.
+        """
         reward = 0.
         done = False
+        print(srv)
+        if srv in self.goal:
+            done = True
+            reward = 1.
+            self.rew_counter += 1
+        elif self.goal_srv_max is not None and max(srv)>=self.goal_srv_max:
+            done = True # TODO: we can remove it and let it keep playing
+            reward = 1.
+            self.rew_counter += 1
         if self.time_step >= self.max_steps:
             done = True
-            reward = 0.
-        elif srv in self.goal:
-            done = True
-            reward = 1.
-        elif max(srv)>=self.srv_max and self.srv_max !=0:
-            done = True
-            reward = 1.
-            self.counter+=1
         return reward, done
-
-
-if __name__ == "__main__":
-    name = 'entangled-ions-v0'
-    # dimension of the qudit
-    DIM = 3
-    # number of qudits
-    NUM_IONS = 5
-    # number of operations:
-    MAX_OP = 10
-    # conditioons for the reward function
-    SRV_MAX = 2
-    env = gym.make(name, dim=DIM, num_ions=NUM_IONS, max_op=MAX_OP, srv_max=SRV_MAX)
-    print(env.action_labels)
